@@ -1,0 +1,41 @@
+---
+title: "Practical Time-Series Clustering for Messy Data in R"
+author: "Jonathan Page"
+date: "1/13/2018"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Raw data
+
+See `table_descriptions.txt` for the query used to extract the following CSVs.
+
+```{r}
+library(tidyverse)
+transactions <- read_csv("contributor_transactions.csv")
+end_of_time <- max(transactions$payment_date)
+campaigns <- read_csv("campaigns.csv", na = c("", "0000-00-00 00:00:00")) %>%
+  mutate(days_old = as.numeric(difftime(end_of_time, date_created, units = "days")))
+```
+
+Join campaign `date_created` and `currency` (`KES` or `USD`). Create anonymous contributor id. 
+Subtract `date_created` to get `day_of_campaign` (starting at 1) (floor plus 1). `inner_join` will
+remove the campaign that is used for testing since it doesn't exist in the campaigns table.
+
+```{r}
+transactions <- transactions %>%
+  inner_join(campaigns %>% select(campaign_id, date_created, currency)) %>%
+  mutate(
+    contributor = sapply(paying_msisdn, FUN=digest::digest),
+    day_of_campaign = as.numeric(difftime(payment_date, date_created, units = "days"))
+  ) %>%
+  select(-paying_msisdn, -date_created)
+```
+
+```{r}
+save(transactions, campaigns, file="clean.RData")
+```
+
